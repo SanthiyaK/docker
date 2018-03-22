@@ -1,0 +1,17 @@
+#include<stdio.h>
+#include<string.h>
+void main()
+{
+int c=0,i,l;
+char s[20];
+scanf("%[^\n]s",s);
+l=strlen(s);
+for(i=0;i<=l;i++)
+{
+if(s[i]=='.')
+{
+c++;
+}
+}
+printf("%d",c+1);
+}
