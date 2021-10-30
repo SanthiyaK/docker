@@ -1,0 +1,83 @@
+---
+- hosts: webserver
+  become: true
+  vars:
+    host_user: ubuntu 
+    project_root_dir: /srv
+  tasks:
+  - name: Ensure group “deploy” exists
+    group:
+      name: deploy
+      state: present
+
+  - name: Add the user ‘{{ host_user }}’ with a specific uid and a primary group of ‘admin’
+    shell: adduser ubuntu deploy
+
+  - name: recursively change owership of a directory
+    shell: chown -R ubuntu:deploy /srv
+
+  - name: Change file ownership, group and permissions
+    shell: chmod 2775 "{{ project_root_dir }}"
+
+  - name: Execute the command in remote shell; stdout goes to the specified file on the remote.
+    shell: find {{ project_root_dir }} -type d -exec chmod 2775 {} +
+
+  - name: Execute the command in remote shell; stdout goes to the specified file on the remote.
+    shell: find {{ project_root_dir }} -type f -exec chmod 0664 {} +
+
+
+
+#Add package Repositories
+  - name: Add node repo
+    shell: curl -sL https://deb.nodesource.com/setup_14.x | sudo bash -
+
+  - name: Add Yarn Repo
+    shell: curl -sL https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
+
+  - name: Add yarn repository into sources list
+    shell:  echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
+
+
+#Install Packages Node, yarn, pm2, angular
+  - name: Update repositories cache
+    apt: update_cache=yes
+
+  - name: Add package Node & yarn
+    apt: pkg={{ item }} state=present
+    with_items:
+    - nodejs
+    - yarn
+    - nginx
+
+  - name: Add npm package pm2
+    npm:
+      name: pm2
+      global: yes
+
+  - name: Add npm package angualar
+    npm:
+      name: '@angular/cli'
+      global: yes
+
+  - name: Permission for .config
+    shell: sudo chown -R datafetch-sandbox:deploy ~/.config
+
+#for ssl certificate
+  - name: Install snap core
+    snap:
+     name: core
+
+  - name: Remove certbot
+    apt: pkg=certbot state=absent
+
+  - name: Install certbot with option --classic
+    snap:
+     name: certbot
+     classic: yes
+
+  - name: Create symbolic link for certbot
+    file:
+      src: /snap/bin/certbot
+      dest: /usr/bin/certbot
+      state: link
+

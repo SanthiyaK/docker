@@ -1,0 +1,80 @@
+---
+- hosts: webserver 
+  vars: 
+    project_root_dir: "/srv"
+    ssl_email: "test@example.com"
+    api_url: 'api.example.plts-dev.com'
+    ui_url: 'example.plts-dev.com'
+    key_path: /home/ubuntu/.ssh/
+
+  tasks:
+  - name: Add repo key. 
+    become_user: ubuntu
+    copy: 
+      src: repo_key.j2 
+      dest: "{{ key_path }}repo_key"
+      mode: '0600'
+
+  - name: Add config file. 
+    become_user: ubuntu
+    copy: 
+      src: config 
+      dest: "{{ key_path }}config"
+
+
+  - name: Get stuff from git for API
+    become_user: ubuntu
+    git:
+       repo: git@bitbucket.org:datafetch/datafetchchatbackend.git
+       dest: "{{ project_root_dir }}/Data-Fetch-API"
+       version: master
+       accept_hostkey: yes
+       force: yes
+  - name: Get stuff from git for UI
+    become_user: ubuntu
+    git:
+       repo: git@bitbucket.org:datafetch/datafetchchatfrontend.git
+       dest: "{{ project_root_dir }}/Data-Fetch-UI"
+       version: master
+       accept_hostkey: yes
+       force: yes
+
+#Copy environment files and conf files
+  #for data-fetch-api
+  - name: .env file in the API
+    copy: src=env.j2 dest="{{ project_root_dir }}/Data-Fetch-API/.env"
+
+  - name: datafetch-api.conf in /etc/nginx/sites-available
+    become: true
+    copy: src=datafetch-api.conf dest=/etc/nginx/sites-available
+
+  #for data-fetch-ui
+  - name: environment.prod.ts file in /srv/Data-Fetch-UI/src/environments
+    copy: src=environment.prod.ts dest="{{ project_root_dir }}/Data-Fetch-UI/src/environments/environment.prod.ts "
+
+  - name: data-fetch-ui.conf in /etc/nginx/sites-available
+    become: true
+    copy: src=datafetch-ui.conf dest=/etc/nginx/sites-available
+
+#Softlink sites-available with sites-enabled
+  - name: Create symbolic link for datafetch-ui.conf
+    become: true
+    file:
+      src: /etc/nginx/sites-available/datafetch-ui.conf
+      dest: /etc/nginx/sites-enabled/datafetch-ui.conf
+      state: link
+
+  - name: Create symbolic link for datafetch-api.conf
+    become: true
+    file:
+      src: /etc/nginx/sites-available/datafetch-api.conf
+      dest: /etc/nginx/sites-enabled/datafetch-api.conf
+      state: link
+
+# Install SSL Certificate.
+# API
+  - name: Generate new certificate if one doesn't exist.
+    shell: "sudo certbot --nginx --noninteractive --agree-tos --email {{ ssl_email }} -d {{ api_url }}"
+#  UI
+  - name: Generate new certificate if one doesn't exist.
+    shell: "sudo certbot --nginx --noninteractive --agree-tos --email {{ ssl_email }} -d {{ ui_url }}"
